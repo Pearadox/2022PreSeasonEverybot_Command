@@ -1,0 +1,18 @@
+{
+  "NTProvider": {
+    "types": {
+      "/FMSInfo": "FMSInfo",
+      "/LiveWindow/DriveTrain": "Subsystem",
+      "/LiveWindow/ExampleSubsystem": "Subsystem",
+      "/LiveWindow/Ungrouped/Scheduler": "Scheduler",
+      "/LiveWindow/Ungrouped/drive": "DifferentialDrive"
+    },
+    "windows": {
+      "/LiveWindow/Ungrouped/drive": {
+        "window": {
+          "visible": true
+        }
+      }
+    }
+  }
+}
