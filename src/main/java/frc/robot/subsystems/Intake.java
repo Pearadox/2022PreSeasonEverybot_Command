@@ -37,16 +37,16 @@ public class Intake extends SubsystemBase {
   }
 
   public void stopIntake() {
-    _intake.set(ControlMode.PercentOutput, 0.02);
+    _intake.set(ControlMode.PercentOutput, 0.00);
   }
 
 
   public void lower() {
-    _arm.set(-.3);
+    _arm.set(-.1);
   }
 
   public void raise() {
-    _arm.set(.3);
+    _arm.set(.1);
   }
 
   public void stopArm() {

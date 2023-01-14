@@ -4,16 +4,14 @@
 
 package frc.robot;
 
-import com.ctre.phoenix.motorcontrol.ControlMode;
+import java.time.Instant;
 
+import edu.wpi.first.wpilibj.ADIS16470_IMU;
 import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.XboxController;
-import frc.robot.commands.ArcadeDrive;
-import frc.robot.commands.ExampleCommand;
-import frc.robot.commands.IntakeIn;
-import frc.robot.commands.IntakeOut;
-import frc.robot.commands.IntakeStop;
+import edu.wpi.first.wpilibj.ADIS16470_IMU.IMUAxis;
+import frc.robot.commands.*;
 import frc.robot.subsystems.DriveTrain;
 import frc.robot.subsystems.ExampleSubsystem;
 import frc.robot.subsystems.Intake;
@@ -33,12 +31,16 @@ public class RobotContainer {
   private final ExampleSubsystem m_exampleSubsystem = new ExampleSubsystem();
   private final ExampleCommand m_autoCommand = new ExampleCommand(m_exampleSubsystem);
   private final Joystick _controller = new Joystick(0);
-  private final DriveTrain _driveTrain = new DriveTrain();
+  private final ADIS16470_IMU _gyro = new ADIS16470_IMU();
+  private final DriveTrain _driveTrain = new DriveTrain(_gyro);
   private final Intake _intake = new Intake();
+  
 
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
     // Configure the button bindings
+    _gyro.reset();
+    _gyro.setYawAxis(IMUAxis.kY);
     configureButtonBindings();
     _driveTrain.setDefaultCommand(new ArcadeDrive(_driveTrain, _controller));
     _intake.setDefaultCommand(new IntakeStop(_intake));
@@ -55,7 +57,9 @@ public class RobotContainer {
     new JoystickButton(_controller, 5).whileHeld(new IntakeOut(_intake));
     new JoystickButton(_controller, 4).whileHeld(new RunCommand(_intake::raise, _intake));
     new JoystickButton(_controller, 1).whileHeld(new RunCommand(_intake::lower, _intake));
-    
+    new JoystickButton(_controller, 2).whileHeld(new Stabilize(_driveTrain, _gyro));
+    new JoystickButton(_controller, 3).whenPressed(new InstantCommand(_gyro::reset));
+    new JoystickButton(_controller, 8).whenPressed(new EngageCS(_driveTrain, _gyro));
   }
 
   /**
