@@ -5,18 +5,36 @@
 package frc.robot;
 
 import java.time.Instant;
+import java.util.List;
 
+import com.pathplanner.lib.PathConstraints;
+import com.pathplanner.lib.PathPlanner;
+
+import edu.wpi.first.math.controller.PIDController;
+import edu.wpi.first.math.controller.RamseteController;
+import edu.wpi.first.math.controller.SimpleMotorFeedforward;
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.math.trajectory.Trajectory;
+import edu.wpi.first.math.trajectory.TrajectoryConfig;
+import edu.wpi.first.math.trajectory.TrajectoryGenerator;
+import edu.wpi.first.math.trajectory.constraint.DifferentialDriveVoltageConstraint;
 import edu.wpi.first.wpilibj.ADIS16470_IMU;
 import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.Joystick;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj.ADIS16470_IMU.IMUAxis;
+import frc.robot.Constants.AutoConstants;
+import frc.robot.Constants.DriveTrainConstants;
+import frc.robot.Constants.JoystickConstants;
 import frc.robot.commands.*;
 import frc.robot.subsystems.DriveTrain;
 import frc.robot.subsystems.ExampleSubsystem;
 import frc.robot.subsystems.Intake;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.InstantCommand;
+import edu.wpi.first.wpilibj2.command.RamseteCommand;
 import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj2.command.button.JoystickButton;
 
@@ -40,7 +58,7 @@ public class RobotContainer {
   public RobotContainer() {
     // Configure the button bindings
     _gyro.reset();
-    _gyro.setYawAxis(IMUAxis.kY);
+    _gyro.setYawAxis(IMUAxis.kZ);
     configureButtonBindings();
     _driveTrain.setDefaultCommand(new ArcadeDrive(_driveTrain, _controller));
     _intake.setDefaultCommand(new IntakeStop(_intake));
@@ -53,13 +71,14 @@ public class RobotContainer {
    * edu.wpi.first.wpilibj2.command.button.JoystickButton}.
    */
   private void configureButtonBindings() {
-    new JoystickButton(_controller, 6).whileHeld(new IntakeIn(_intake));
-    new JoystickButton(_controller, 5).whileHeld(new IntakeOut(_intake));
-    new JoystickButton(_controller, 4).whileHeld(new RunCommand(_intake::raise, _intake));
-    new JoystickButton(_controller, 1).whileHeld(new RunCommand(_intake::lower, _intake));
-    new JoystickButton(_controller, 2).whileHeld(new Stabilize(_driveTrain, _gyro));
-    new JoystickButton(_controller, 3).whenPressed(new InstantCommand(_gyro::reset));
-    new JoystickButton(_controller, 8).whenPressed(new EngageCS(_driveTrain, _gyro));
+    new JoystickButton(_controller, JoystickConstants.BUMPER_RIGHT).whileHeld(new IntakeIn(_intake));
+    new JoystickButton(_controller, JoystickConstants.BUMPER_LEFT).whileHeld(new IntakeOut(_intake));
+    new JoystickButton(_controller, JoystickConstants.Y).whileHeld(new RunCommand(_intake::raise, _intake));
+    new JoystickButton(_controller, JoystickConstants.A).whileHeld(new RunCommand(_intake::lower, _intake));
+    new JoystickButton(_controller, JoystickConstants.B).whileHeld(new Stabilize(_driveTrain, _gyro));
+    new JoystickButton(_controller, JoystickConstants.X).whenPressed(new InstantCommand(_gyro::reset));
+    new JoystickButton(_controller, JoystickConstants.LOGO_RIGHT).whenPressed(new EngageCS(_driveTrain, _gyro));    
+    new JoystickButton(_controller, JoystickConstants.LOGO_LEFT).whenPressed(new AutoGetSphubeAndScore(_intake));
   }
 
   /**
@@ -67,8 +86,40 @@ public class RobotContainer {
    *
    * @return the command to run in autonomous
    */
-  public Command getAutonomousCommand() {
+  public Command getAutonomousCommand()
+   {
+
+    Trajectory exampleTrajectory = PathPlanner.loadPath("BOZOZ", new PathConstraints(3, 2));
+        // TrajectoryGenerator.generateTrajectory(
+        //     // Start at the origin facing the +X direction
+        //     new Pose2d(0, 0, new Rotation2d(0)),
+        //     // Pass through these two interior waypoints, making an 's' curve path
+        //     List.of(new Translation2d(1, 0), new Translation2d(2, 0)),
+        //     // End 3 meters straight ahead of where we started, facing forward
+        //     new Pose2d(3, 0, new Rotation2d(0)),
+        //     // Pass config
+        //     config);
+
     // An ExampleCommand will run in autonomous
-    return m_autoCommand;
+    _driveTrain.resetEncoders();
+    _driveTrain.zeroHeading();
+    RamseteCommand ramseteCommand =
+        new RamseteCommand(
+            exampleTrajectory,
+            _driveTrain::getPose,
+            new RamseteController(AutoConstants.kRamseteB, AutoConstants.kRamseteZeta),
+            new SimpleMotorFeedforward(
+              DriveTrainConstants.ksVolts,
+              DriveTrainConstants.kvVoltSecondsPerMeter,
+              DriveTrainConstants.kaVoltSecondsSquaredPerMeter),
+                DriveTrainConstants.kDriveKinematics,
+            _driveTrain::getWheelSpeeds,
+            new PIDController(DriveTrainConstants.kPDriveVel, 0, 0),
+            new PIDController(DriveTrainConstants.kPDriveVel, 0, 0),
+            // RamseteCommand passes volts to the callback
+            _driveTrain::tankDriveVolts,
+            _driveTrain);
+    _driveTrain.resetOdometry(exampleTrajectory.getInitialPose());
+    return ramseteCommand;
   }
 }

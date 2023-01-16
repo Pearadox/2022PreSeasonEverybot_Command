@@ -4,12 +4,18 @@
 
 package frc.robot.subsystems;
 
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.kinematics.DifferentialDriveOdometry;
+import edu.wpi.first.math.kinematics.DifferentialDriveWheelSpeeds;
 import edu.wpi.first.util.sendable.SendableRegistry;
 import edu.wpi.first.wpilibj.ADIS16470_IMU;
 import edu.wpi.first.wpilibj.Joystick;
+import edu.wpi.first.wpilibj.GenericHID.RumbleType;
 import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import frc.robot.Constants.DriveTrainConstants;
 import com.revrobotics.CANSparkMax;
 import com.revrobotics.RelativeEncoder;
 import com.revrobotics.CANSparkMaxLowLevel.MotorType;
@@ -20,59 +26,124 @@ public class DriveTrain extends SubsystemBase {
   private CANSparkMax _backLeft = new CANSparkMax(10, MotorType.kBrushless);
   private CANSparkMax _frontRight = new CANSparkMax(12, MotorType.kBrushless);
   private CANSparkMax _backRight = new CANSparkMax(13, MotorType.kBrushless);
-  private DifferentialDrive drive = new DifferentialDrive(_frontLeft, _frontRight);
+  private DifferentialDrive _drive = new DifferentialDrive(_frontLeft, _frontRight);
   private ADIS16470_IMU _gyro;
+  private DifferentialDriveOdometry _odometry;
+  private RelativeEncoder _leftEncoder;
+  private RelativeEncoder _rightEncoder;
+  private Pose2d _pose;
   
-  /** Creates a new DriveTrain. */
-  public DriveTrain() {
-    SendableRegistry.add(drive, "drive");
-
-    _frontLeft.restoreFactoryDefaults();
-    _frontLeft.burnFlash();
-    _backLeft.restoreFactoryDefaults();
-    _backLeft.burnFlash();
-    _frontRight.restoreFactoryDefaults();
-    _frontRight.burnFlash();
-    _backRight.restoreFactoryDefaults();
-    _backRight.burnFlash();
-
-    _backLeft.follow(_frontLeft);
-    _backRight.follow(_frontRight);
-  }
-
   public DriveTrain(ADIS16470_IMU gyro) {
-    SendableRegistry.add(drive, "drive");
+    SendableRegistry.add(_drive, "drive");
 
     _frontLeft.restoreFactoryDefaults();
     _frontLeft.burnFlash();
+
     _backLeft.restoreFactoryDefaults();
     _backLeft.burnFlash();
+
     _frontRight.restoreFactoryDefaults();
     _frontRight.burnFlash();
+
     _backRight.restoreFactoryDefaults();
     _backRight.burnFlash();
 
     _backLeft.follow(_frontLeft);
     _backRight.follow(_frontRight);
+
     _gyro = gyro;
+
+    _leftEncoder = _frontLeft.getEncoder();
+    _rightEncoder = _frontRight.getEncoder();
+
+    _leftEncoder.setPositionConversionFactor(DriveTrainConstants.kDistancePerWheelRevolutionMeters/DriveTrainConstants.kGearReduction);
+    _rightEncoder.setPositionConversionFactor(DriveTrainConstants.kDistancePerWheelRevolutionMeters/DriveTrainConstants.kGearReduction);
+
+    resetEncoders();
+    _odometry =
+        new DifferentialDriveOdometry(
+            Rotation2d.fromDegrees(_gyro.getAngle()), new Pose2d(0.0, 0.0, new Rotation2d(0.0)));
   }
 
   @Override
   public void periodic() {
-    SmartDashboard.putNumber("Gyro Pitch", _gyro.getAngle());
+    SmartDashboard.putNumber("Gyro", _gyro.getAngle());
+    SmartDashboard.putNumber("Left Encoder", -_leftEncoder.getPosition());
+    SmartDashboard.putNumber("Right Encoder", _rightEncoder.getPosition());
+    _pose = _odometry.update(Rotation2d.fromDegrees(_gyro.getAngle()), -_leftEncoder.getPosition(), _rightEncoder.getPosition());
+      Pose2d pose = getPose();
+      SmartDashboard.putNumber("Pose X", pose.getX());
+      SmartDashboard.putNumber("Pose y", pose.getY());
   }
-
+  
   public void teleopDrive(Joystick controller) {
     double axis4 = controller.getRawAxis(4);
     double axis1 = controller.getRawAxis(1);
+    controller.setRumble(RumbleType.kLeftRumble, 1); 
     drive(axis4, axis1);
+    controller.setRumble(RumbleType.kRightRumble, 0);
   }
 
   public void drive(double rotation, double direction){
-    drive.arcadeDrive(rotation, direction);
+    _drive.arcadeDrive(rotation, direction);      
   }
 
   public RelativeEncoder getEncoder() {
     return _frontLeft.getEncoder();
   }
+   /**
+   * Returns the currently-estimated pose of the robot.
+   *
+   * @return The pose.
+   */
+  public Pose2d getPose() {
+    return _pose;
+    // return _odometry.getPoseMeters();
+  }
+
+  /**
+   * Returns the current wheel speeds of the robot.
+   *
+   * @return The current wheel speeds.
+   */
+  public DifferentialDriveWheelSpeeds getWheelSpeeds() {
+    return new DifferentialDriveWheelSpeeds(-_leftEncoder.getVelocity() / 60, _rightEncoder.getVelocity() / 60);
+  }
+
+  /**
+   * Resets the odometry to the specified pose.
+   *
+   * @param pose The pose to which to set the odometry.
+   */
+  public void resetOdometry(Pose2d pose) {
+    resetEncoders();
+    _odometry.resetPosition(pose, Rotation2d.fromDegrees(_gyro.getAngle()));
+  }
+
+  /**
+   * Controls the left and right sides of the drive directly with voltages.
+   *
+   * @param leftVolts the commanded left output
+   * @param rightVolts the commanded right output
+   */
+  public void tankDriveVolts(double leftVolts, double rightVolts) {
+    _frontLeft.setVoltage(-rightVolts);
+    _backLeft.setVoltage(-rightVolts);
+    _frontRight.setVoltage(leftVolts);
+    _backRight.setVoltage(leftVolts);
+    
+    _drive.feed();
+  }
+
+  /** Resets the drive encoders to currently read a position of 0. */
+  public void resetEncoders() {
+    _leftEncoder.setPosition(0);
+    _rightEncoder.setPosition(0);
+  }
+
+  /** Zeroes the heading of the robot. */
+  public void zeroHeading() {
+    _gyro.reset();
+  }
+
 }

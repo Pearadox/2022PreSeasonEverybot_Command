@@ -4,19 +4,16 @@
 
 package frc.robot.commands;
 
-import edu.wpi.first.wpilibj.ADIS16470_IMU;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
-import frc.robot.subsystems.DriveTrain;
+import frc.robot.subsystems.Intake;
 
 // NOTE:  Consider using this command inline, rather than writing a subclass.  For more
 // information, see:
 // https://docs.wpilib.org/en/stable/docs/software/commandbased/convenience-features.html
-public class EngageCS extends SequentialCommandGroup {
-  /** Creates a new EngageCS. */
-  public EngageCS(DriveTrain driveTrain, ADIS16470_IMU gyro) {
-    // Add your commands in the addCommands() call, e.g.
-    // addCommands(new FooCommand(), new BarCommand());
-    addCommands(new DriveToCS(driveTrain), new Stabilize(driveTrain, gyro));
+public class AutoGetSphubeAndScore extends SequentialCommandGroup {
+  /** Creates a new AutoGetSphubeAndScore. */
+  
+  public AutoGetSphubeAndScore(Intake intake) {
+    addCommands(new AutoIntakeDown(intake), new AutoIntakeUp(intake));
   }
 }
-

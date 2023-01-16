@@ -7,6 +7,7 @@ package frc.robot.commands;
 import com.revrobotics.RelativeEncoder;
 
 import edu.wpi.first.math.util.Units;
+import edu.wpi.first.wpilibj.interfaces.Gyro;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.CommandBase;
 import frc.robot.subsystems.DriveTrain;
