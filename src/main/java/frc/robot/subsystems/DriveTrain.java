@@ -16,6 +16,9 @@ import edu.wpi.first.wpilibj.drive.DifferentialDrive;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants.DriveTrainConstants;
+
+import java.io.Console;
+
 import com.revrobotics.CANSparkMax;
 import com.revrobotics.RelativeEncoder;
 import com.revrobotics.CANSparkMaxLowLevel.MotorType;
@@ -79,9 +82,7 @@ public class DriveTrain extends SubsystemBase {
   public void teleopDrive(Joystick controller) {
     double axis4 = controller.getRawAxis(4);
     double axis1 = controller.getRawAxis(1);
-    controller.setRumble(RumbleType.kLeftRumble, 1); 
     drive(axis4, axis1);
-    controller.setRumble(RumbleType.kRightRumble, 0);
   }
 
   public void drive(double rotation, double direction){
@@ -116,8 +117,12 @@ public class DriveTrain extends SubsystemBase {
    * @param pose The pose to which to set the odometry.
    */
   public void resetOdometry(Pose2d pose) {
+    try{
     resetEncoders();
-    _odometry.resetPosition(pose, Rotation2d.fromDegrees(_gyro.getAngle()));
+    _odometry.resetPosition(pose, Rotation2d.fromDegrees(_gyro.getAngle()));}
+    catch(Exception e){
+      System.out.println(e.getMessage() + " <<<<<< OUR MESSAGE");
+    }
   }
 
   /**
@@ -144,6 +149,9 @@ public class DriveTrain extends SubsystemBase {
   /** Zeroes the heading of the robot. */
   public void zeroHeading() {
     _gyro.reset();
+  }
+  public void resetPose(Pose2d pose) {
+    _pose = pose;
   }
 
 }

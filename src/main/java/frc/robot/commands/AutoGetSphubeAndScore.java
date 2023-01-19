@@ -4,6 +4,7 @@
 
 package frc.robot.commands;
 
+import edu.wpi.first.wpilibj2.command.ParallelCommandGroup;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import frc.robot.subsystems.Intake;
 
@@ -14,6 +15,6 @@ public class AutoGetSphubeAndScore extends SequentialCommandGroup {
   /** Creates a new AutoGetSphubeAndScore. */
   
   public AutoGetSphubeAndScore(Intake intake) {
-    addCommands(new AutoIntakeDown(intake), new AutoIntakeUp(intake));
+    addCommands(new AutoIntakeDown(intake), new IntakeIn(intake),new AutoIntakeUp(intake));
   }
 }

@@ -5,10 +5,15 @@
 package frc.robot;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 import com.pathplanner.lib.PathConstraints;
 import com.pathplanner.lib.PathPlanner;
+import com.pathplanner.lib.PathPlannerTrajectory;
+import com.pathplanner.lib.auto.PIDConstants;
+import com.pathplanner.lib.auto.RamseteAutoBuilder;
 
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.controller.RamseteController;
@@ -39,9 +44,12 @@ import edu.wpi.first.wpilibj2.command.RunCommand;
 import edu.wpi.first.wpilibj2.command.button.JoystickButton;
 
 /**
- * This class is where the bulk of the robot should be declared. Since Command-based is a
- * "declarative" paradigm, very little robot logic should actually be handled in the {@link Robot}
- * periodic methods (other than the scheduler calls). Instead, the structure of the robot (including
+ * This class is where the bulk of the robot should be declared. Since
+ * Command-based is a
+ * "declarative" paradigm, very little robot logic should actually be handled in
+ * the {@link Robot}
+ * periodic methods (other than the scheduler calls). Instead, the structure of
+ * the robot (including
  * subsystems, commands, and button mappings) should be declared here.
  */
 public class RobotContainer {
@@ -52,9 +60,10 @@ public class RobotContainer {
   private final ADIS16470_IMU _gyro = new ADIS16470_IMU();
   private final DriveTrain _driveTrain = new DriveTrain(_gyro);
   private final Intake _intake = new Intake();
-  
 
-  /** The container for the robot. Contains subsystems, OI devices, and commands. */
+  /**
+   * The container for the robot. Contains subsystems, OI devices, and commands.
+   */
   public RobotContainer() {
     // Configure the button bindings
     _gyro.reset();
@@ -65,9 +74,11 @@ public class RobotContainer {
   }
 
   /**
-   * Use this method to define your button->command mappings. Buttons can be created by
+   * Use this method to define your button->command mappings. Buttons can be
+   * created by
    * instantiating a {@link GenericHID} or one of its subclasses ({@link
-   * edu.wpi.first.wpilibj.Joystick} or {@link XboxController}), and then passing it to a {@link
+   * edu.wpi.first.wpilibj.Joystick} or {@link XboxController}), and then passing
+   * it to a {@link
    * edu.wpi.first.wpilibj2.command.button.JoystickButton}.
    */
   private void configureButtonBindings() {
@@ -77,7 +88,7 @@ public class RobotContainer {
     new JoystickButton(_controller, JoystickConstants.A).whileHeld(new RunCommand(_intake::lower, _intake));
     new JoystickButton(_controller, JoystickConstants.B).whileHeld(new Stabilize(_driveTrain, _gyro));
     new JoystickButton(_controller, JoystickConstants.X).whenPressed(new InstantCommand(_gyro::reset));
-    new JoystickButton(_controller, JoystickConstants.LOGO_RIGHT).whenPressed(new EngageCS(_driveTrain, _gyro));    
+    new JoystickButton(_controller, JoystickConstants.LOGO_RIGHT).whenPressed(new EngageCS(_driveTrain, _gyro));
     new JoystickButton(_controller, JoystickConstants.LOGO_LEFT).whenPressed(new AutoGetSphubeAndScore(_intake));
   }
 
@@ -86,40 +97,64 @@ public class RobotContainer {
    *
    * @return the command to run in autonomous
    */
-  public Command getAutonomousCommand()
-   {
+  public Command getAutonomousCommand() {
 
-    Trajectory exampleTrajectory = PathPlanner.loadPath("BOZOZ", new PathConstraints(3, 2));
-        // TrajectoryGenerator.generateTrajectory(
-        //     // Start at the origin facing the +X direction
-        //     new Pose2d(0, 0, new Rotation2d(0)),
-        //     // Pass through these two interior waypoints, making an 's' curve path
-        //     List.of(new Translation2d(1, 0), new Translation2d(2, 0)),
-        //     // End 3 meters straight ahead of where we started, facing forward
-        //     new Pose2d(3, 0, new Rotation2d(0)),
-        //     // Pass config
-        //     config);
+    // Trajectory exampleTrajectory = PathPlanner.loadPath("sphube pickup", new
+    // PathConstraints(3, 2),true);
+    List<PathPlannerTrajectory> pathGroup = PathPlanner.loadPathGroup("sphube pickup", true, new PathConstraints(4, 3));
+    // This is just an example event map. It would be better to have a constant,
+    // global event map
+    // in your code that will be used by all path following commands.
+    HashMap<String, Command> eventMap = new HashMap<>();
+    eventMap.put("IntakeDown", new AutoIntakeDown(_intake));
+    eventMap.put("IntakeIn", new IntakeIn(_intake));
+    eventMap.put("IntakeStop", new IntakeStop(_intake));
+    eventMap.put("IntakeOut", new IntakeOut(_intake));
 
-    // An ExampleCommand will run in autonomous
-    _driveTrain.resetEncoders();
-    _driveTrain.zeroHeading();
-    RamseteCommand ramseteCommand =
-        new RamseteCommand(
-            exampleTrajectory,
-            _driveTrain::getPose,
-            new RamseteController(AutoConstants.kRamseteB, AutoConstants.kRamseteZeta),
-            new SimpleMotorFeedforward(
-              DriveTrainConstants.ksVolts,
-              DriveTrainConstants.kvVoltSecondsPerMeter,
-              DriveTrainConstants.kaVoltSecondsSquaredPerMeter),
-                DriveTrainConstants.kDriveKinematics,
-            _driveTrain::getWheelSpeeds,
-            new PIDController(DriveTrainConstants.kPDriveVel, 0, 0),
-            new PIDController(DriveTrainConstants.kPDriveVel, 0, 0),
-            // RamseteCommand passes volts to the callback
-            _driveTrain::tankDriveVolts,
-            _driveTrain);
-    _driveTrain.resetOdometry(exampleTrajectory.getInitialPose());
-    return ramseteCommand;
+    // Create the AutoBuilder. This only needs to be created once when robot code
+    // starts, not every time you want to create an auto command. A good place to
+    // put this is in RobotContainer along with your subsystems.
+    RamseteAutoBuilder autoBuilder = new RamseteAutoBuilder(
+        _driveTrain::getPose, // Pose2d supplier
+        _driveTrain::resetOdometry, // Pose2d consumer, used to reset odometry at the beginning of auto
+        new RamseteController(AutoConstants.kRamseteB, AutoConstants.kRamseteZeta),
+        DriveTrainConstants.kDriveKinematics, // SwerveDriveKinematics
+        new SimpleMotorFeedforward(
+            DriveTrainConstants.ksVolts,
+            DriveTrainConstants.kvVoltSecondsPerMeter,
+            DriveTrainConstants.kaVoltSecondsSquaredPerMeter),
+        _driveTrain::getWheelSpeeds,
+        new PIDConstants(DriveTrainConstants.kPDriveVel, 0, 0),
+        _driveTrain::tankDriveVolts,
+        eventMap,
+        true, // Should the path be automatically mirrored depending on alliance color.
+              // Optional, defaults to true
+        _driveTrain // The drive subsystem. Used to properly set the requirements of path following
+                    // commands
+
+    );
+    return autoBuilder.fullAuto(pathGroup);
   }
+  // // An ExampleCommand will run in autonomous
+  // _driveTrain.resetEncoders();
+  // _driveTrain.zeroHeading();
+  // RamseteCommand ramseteCommand =
+  // new RamseteCommand(
+  // exampleTrajectory,
+  // _driveTrain::getPose,
+  // new RamseteController(AutoConstants.kRamseteB, AutoConstants.kRamseteZeta),
+  // new SimpleMotorFeedforward(
+  // DriveTrainConstants.ksVolts,
+  // DriveTrainConstants.kvVoltSecondsPerMeter,
+  // DriveTrainConstants.kaVoltSecondsSquaredPerMeter),
+  // DriveTrainConstants.kDriveKinematics,
+  // _driveTrain::getWheelSpeeds,
+  // new PIDController(DriveTrainConstants.kPDriveVel, 0, 0),
+  // new PIDController(DriveTrainConstants.kPDriveVel, 0, 0),
+  // // RamseteCommand passes volts to the callback
+  // _driveTrain::tankDriveVolts,
+  // _driveTrain);
+  // _driveTrain.resetOdometry(exampleTrajectory.getInitialPose());
+  // return ramseteCommand;
+  // }
 }
